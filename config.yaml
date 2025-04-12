@@ -1,0 +1,71 @@
+---
+# Knowledge Management System Configuration
+
+# Chunking configuration
+chunking:
+  max_tokens: 512
+  overlap: 64
+  preserve_tables: true
+  preserve_code_blocks: true
+  preserve_headers: true
+
+# Vector embedding configuration
+embedding:
+  model: all-mpnet-base-v2
+  dimension: 768
+  batch_size: 32
+
+# Search configuration
+search:
+  vector_weight: 0.7
+  keyword_weight: 0.3
+  reranking: true
+  top_k: 10
+
+# Storage configuration
+storage:
+  git:
+    enabled: true
+    lfs_enabled: true
+    commit_message_template: "Add document: {filename}"
+  vector_db:
+    type: faiss  # or qdrant
+    index_type: IndexFlatL2
+    update_frequency: daily
+
+# Security configuration
+security:
+  encryption:
+    at_rest: AES-256
+    in_transit: TLS-1.3
+  access_control:
+    enabled: true
+    default_policy: deny
+  audit:
+    enabled: true
+    retention: 90days
+
+# Retention policies
+retention_rules:
+  financial:
+    default: 7yrs
+    exceptions:
+      SOX: 10yrs
+  healthcare:
+    hipaa: 6yrs
+    emr: patient_lifetime
+  legal:
+    default: 10yrs
+    exceptions:
+      litigation_hold: indefinite
+
+# Monitoring
+monitoring:
+  metrics:
+    - ingestion_rate
+    - embedding_quality
+    - cache_hit_ratio
+  alerts:
+    - latency > 1s
+    - error_rate > 2%
+    - compliance_violation
