@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+        .header {
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e5e5e5;
+            margin-bottom: 30px;
+        }
+        .footer {
+            padding-top: 20px;
+            color: #777;
+            border-top: 1px solid #e5e5e5;
+            margin-top: 30px;
+        }
+        .nav-tabs {
+            margin-bottom: 20px;
+        }
+        .progress {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        .task-card {
+            margin-bottom: 15px;
+        }
+        #dropzone {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 25px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            background-color: #f8f9fa;
+        }
+        #dropzone.highlight {
+            border-color: #2196F3;
+            background-color: #e3f2fd;
+        }
+        .file-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .resource-monitor {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Knowledge Management System</h1>
+        <p class="lead">Create, manage, and search knowledge bases with RAG compatibility</p>
+    </div>
+
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home" type="button" role="tab" aria-controls="home" aria-selected="true">Home</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab" aria-controls="upload" aria-selected="false">Upload</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="kbs-tab" data-bs-toggle="tab" data-bs-target="#kbs" type="button" role="tab" aria-controls="kbs" aria-selected="false">Knowledge Bases</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tasks-tab" data-bs-toggle="tab" data-bs-target="#tasks" type="button" role="tab" aria-controls="tasks" aria-selected="false">Tasks</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="search-tab" data-bs-toggle="tab" data-bs-target="#search" type="button" role="tab" aria-controls="search" aria-selected="false">Search</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+        <!-- Home Tab -->
+        <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
+            <div class="row">
+                <div class="col-md-8">
+                    <h2>Welcome to the Knowledge Management System</h2>
+                    <p>
+                        This system allows you to create and manage knowledge bases with robust
+                        citation information, supporting Retrieval-Augmented Generation (RAG) applications.
+                    </p>
+                    <h3>Key Features</h3>
+                    <ul>
+                        <li>Process large batches of documents (up to 100+ at once)</li>
+                        <li>Resource-efficient processing with controlled memory usage</li>
+                        <li>Automatic generation of citation information</li>
+                        <li>Document chunking optimized for RAG</li>
+                        <li>Knowledge maps and process documentation</li>
+                        <li>Git-based versioning for all content</li>
+                    </ul>
+                    <p>
+                        <a href="#" onclick="$('#upload-tab').tab('show');" class="btn btn-primary">Upload Documents</a>
+                        <a href="#" onclick="$('#kbs-tab').tab('show');" class="btn btn-outline-secondary">Manage Knowledge Bases</a>
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            System Status
+                        </div>
+                        <div class="card-body">
+                            <div class="resource-monitor">
+                                <h5>Resource Usage</h5>
+                                <div class="mb-2">
+                                    <label>CPU: <span id="cpu-usage">N/A</span></label>
+                                    <div class="progress">
+                                        <div id="cpu-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label>Memory: <span id="memory-usage">N/A</span></label>
+                                    <div class="progress">
+                                        <div id="memory-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label>Active Workers: <span id="worker-count">0</span></label>
+                                </div>
+                            </div>
+                            <div>
+                                <h5>Knowledge Bases</h5>
+                                <p id="kb-count">Loading...</p>
+                            </div>
+                            <div>
+                                <h5>Active Tasks</h5>
+                                <p id="active-task-count">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Tab -->
+        <div class="tab-pane fade" id="upload" role="tabpanel" aria-labelledby="upload-tab">
+            <h2>Upload Documents</h2>
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-body">
+                            <form id="upload-form">
+                                <div class="mb-3">
+                                    <label for="kb-select" class="form-label">Knowledge Base</label>
+                                    <div class="input-group">
+                                        <select class="form-select" id="kb-select" required>
+                                            <option value="">Select Knowledge Base</option>
+                                            <!-- KBs will be loaded here -->
+                                        </select>
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#createKbModal">
+                                            Create New
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Documents</label>
+                                    <div id="dropzone">
+                                        <p>Drag & drop files here or click to browse</p>
+                                        <input type="file" id="file-input" multiple style="display: none;" />
+                                    </div>
+                                    <div class="file-list" id="file-list">
+                                        <p>No files selected</p>
+                                    </div>
+                                    <small class="text-muted">You can upload up to 100 files at once.</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Processing Options</label>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="auto-chunk" checked>
+                                        <label class="form-check-label" for="auto-chunk">Automatically chunk documents for RAG</label>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="create-maps" checked>
+                                        <label class="form-check-label" for="create-maps">Create knowledge maps</label>
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-primary" id="upload-button">
+                                        Upload and Process Documents
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            Upload Tips
+                        </div>
+                        <div class="card-body">
+                            <h5>Supported File Types</h5>
+                            <ul>
+                                <li>Code files (.py, .js, .ts, .java, etc.)</li>
+                                <li>Markdown (.md)</li>
+                                <li>Text (.txt)</li>
+                                <li>PDF (.pdf)</li>
+                                <li>Images (.jpg, .png, etc.) - will be converted to text</li>
+                            </ul>
+                            <h5>Processing</h5>
+                            <p>
+                                Files are processed to extract structure, metadata, and citation information.
+                                Large batches will be processed in chunks to limit resource usage.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Progress -->
+            <div id="upload-progress-container" style="display: none; margin-top: 20px;">
+                <h3>Upload Progress</h3>
+                <div class="card">
+                    <div class="card-body">
+                        <h5 id="upload-status">Uploading...</h5>
+                        <div class="progress">
+                            <div id="upload-progress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <p id="upload-message"></p>
+                        <div id="upload-details"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Knowledge Bases Tab -->
+        <div class="tab-pane fade" id="kbs" role="tabpanel" aria-labelledby="kbs-tab">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Knowledge Bases</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createKbModal">Create New Knowledge Base</button>
+            </div>
+            <div id="kb-list" class="row">
+                <!-- KBs will be loaded here -->
+                <p>Loading knowledge bases...</p>
+            </div>
+        </div>
+
+        <!-- Tasks Tab -->
+        <div class="tab-pane fade" id="tasks" role="tabpanel" aria-labelledby="tasks-tab">
+            <h2>Processing Tasks</h2>
+            <div class="row">
+                <div class="col-md-6">
+                    <h3>Active Tasks</h3>
+                    <div id="active-tasks-list">
+                        <!-- Active tasks will be loaded here -->
+                        <p>No active tasks</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h3>Completed Tasks</h3>
+                    <div id="completed-tasks-list">
+                        <!-- Completed tasks will be loaded here -->
+                        <p>No completed tasks</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Tab -->
+        <div class="tab-pane fade" id="search" role="tabpanel" aria-labelledby="search-tab">
+            <h2>Search Knowledge Base</h2>
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-body">
+                            <form id="search-form">
+                                <div class="mb-3">
+                                    <label for="search-kb-select" class="form-label">Knowledge Base</label>
+                                    <select class="form-select" id="search-kb-select" required>
+                                        <option value="">Select Knowledge Base</option>
+                                        <!-- KBs will be loaded here -->
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="search-query" class="form-label">Search Query</label>
+                                    <input type="text" class="form-control" id="search-query" placeholder="Enter search query" required>
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-primary">Search</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="search-results" style="margin-top: 20px;">
+                <!-- Search results will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2025 Knowledge Management System</p>
+    </div>
+</div>
+
+<!-- Create KB Modal -->
+<div class="modal fade" id="createKbModal" tabindex="-1" aria-labelledby="createKbModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createKbModalLabel">Create New Knowledge Base</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="create-kb-form">
+                    <div class="mb-3">
+                        <label for="kb-name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="kb-name" placeholder="e.g., technical_docs" required>
+                        <small class="form-text text-muted">Use only letters, numbers, and underscores.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="kb-description" class="form-label">Description</label>
+                        <textarea class="form-control" id="kb-description" rows="3" placeholder="Optional description"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="kb-owner" class="form-label">Owner</label>
+                        <input type="text" class="form-control" id="kb-owner" placeholder="e.g., John Doe">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="create-kb-button">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Detail Modal -->
+<div class="modal fade" id="taskDetailModal" tabindex="-1" aria-labelledby="taskDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="taskDetailModalLabel">Task Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="task-detail-content">
+                <!-- Task details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KB Detail Modal -->
+<div class="modal fade" id="kbDetailModal" tabindex="-1" aria-labelledby="kbDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="kbDetailModalLabel">Knowledge Base Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="kb-detail-content">
+                <!-- KB details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Variable to store selected files
+    let selectedFiles = [];
+    let currentWorkflowId = null;
+    let refreshInterval = null;
+
+    // DOM ready
+    $(document).ready(function() {
+        // Initialize UI
+        loadKnowledgeBases();
+        loadTasks();
+        updateSystemStatus();
+
+        // Start periodic refresh for tasks
+        refreshInterval = setInterval(function() {
+            if (currentWorkflowId) {
+                checkWorkflowStatus(currentWorkflowId);
+            }
+            loadTasks();
+            updateSystemStatus();
+        }, 5000);
+
+        // Dropzone functionality
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-input');
+        const fileList = document.getElementById('file-list');
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('highlight');
+        });
+        
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('highlight');
+        });
+        
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('highlight');
+            
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+        
+        fileInput.addEventListener('change', () => {
+            handleFiles(fileInput.files);
+        });
+
+        // Handle form submissions
+        $('#upload-form').on('submit', function(e) {
+            e.preventDefault();
+            uploadFiles();
+        });
+
+        $('#create-kb-button').on('click', function() {
+            createKnowledgeBase();
+        });
+
+        $('#search-form').on('submit', function(e) {
+            e.preventDefault();
+            searchKnowledgeBase();
+        });
+    });
+
+    // Function to handle file selection
+    function handleFiles(files) {
+        if (files.length === 0) return;
+        
+        selectedFiles = Array.from(files);
+        updateFileList();
+    }
+
+    // Update the file list display
+    function updateFileList() {
+        if (selectedFiles.length === 0) {
+            fileList.innerHTML = '<p>No files selected</p>';
+            return;
+        }
+        
+        let html = '<ul class="list-group">';
+        for (let i = 0; i < selectedFiles.length; i++) {
+            const file = selectedFiles[i];
+            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                ${file.name}
+                <span class="badge bg-primary rounded-pill">${formatFileSize(file.size)}</span>
+            </li>`;
+        }
+        html += '</ul>';
+        
+        fileList.innerHTML = html;
+    }
+
+    // Helper function to format file size
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Upload files to the server
+    function uploadFiles() {
+        if (selectedFiles.length === 0) {
+            alert('Please select files to upload');
+            return;
+        }
+        
+        const kbName = $('#kb-select').val();
+        if (!kbName) {
+            alert('Please select a knowledge base');
+            return;
+        }
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('kb_name', kbName);
+        
+        for (let i = 0; i < selectedFiles.length; i++) {
+            formData.append('files', selectedFiles[i]);
+        }
+        
+        // Show progress container
+        $('#upload-progress-container').show();
+        $('#upload-status').text('Uploading...');
+        $('#upload-progress').css('width', '0%');
+        $('#upload-message').text(`Uploading ${selectedFiles.length} files...`);
+        
+        // Disable upload button
+        $('#upload-button').prop('disabled', true);
+        
+        // Send request
+        $.ajax({
+            url: '/api/process_workflow',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            xhr: function() {
+                const xhr = new XMLHttpRequest();
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        $('#upload-progress').css('width', percent + '%');
+                        $('#upload-progress').text(percent + '%');
+                    }
+                });
+                return xhr;
+            },
+            success: function(response) {
+                $('#upload-status').text('Files uploaded. Processing...');
+                $('#upload-message').text(`Starting processing workflow. This may take some time.`);
+                $('#upload-progress').addClass('bg-info');
+                
+                // Store the workflow ID for status checking
+                currentWorkflowId = response.workflow_id;
+                
+                // Check status immediately
+                checkWorkflowStatus(currentWorkflowId);
+            },
+            error: function(xhr) {
+                $('#upload-status').text('Upload Failed');
+                $('#upload-progress').addClass('bg-danger');
+                $('#upload-message').text(`Error: ${xhr.responseJSON?.error || 'Unknown error'}`);
+                $('#upload-button').prop('disabled', false);
+            }
+        });
+    }
+
+    // Check the status of a workflow
+    function checkWorkflowStatus(workflowId) {
+        $.get(`/api/tasks/${workflowId}`, function(task) {
+            if (task.status === 'completed') {
+                $('#upload-status').text('Processing Completed');
+                $('#upload-progress').removeClass('bg-info').addClass('bg-success');
+                $('#upload-progress').css('width', '100%');
+                $('#upload-message').text('All documents have been processed successfully.');
+                
+                // Clear current workflow ID
+                currentWorkflowId = null;
+                
+                // Enable upload button
+                $('#upload-button').prop('disabled', false);
+                
+                // Load updated KB list
+                loadKnowledgeBases();
+                
+                // Display results
+                let resultsHtml = '<h5>Processing Results:</h5>';
+                if (task.result) {
+                    resultsHtml += '<ul>';
+                    for (const key in task.result) {
+                        resultsHtml += `<li>${key}: ${JSON.stringify(task.result[key])}</li>`;
+                    }
+                    resultsHtml += '</ul>';
+                }
+                $('#upload-details').html(resultsHtml);
+                
+            } else if (task.status === 'error') {
+                $('#upload-status').text('Processing Failed');
+                $('#upload-progress').removeClass('bg-info').addClass('bg-danger');
+                $('#upload-message').text(`Error: ${task.error || 'Unknown error'}`);
+                
+                // Clear current workflow ID
+                currentWorkflowId = null;
+                
+                // Enable upload button
+                $('#upload-button').prop('disabled', false);
+                
+            } else {
+                // Still processing
+                $('#upload-status').text('Processing...');
+                $('#upload-progress').css('width', task.progress + '%');
+                $('#upload-progress').text(Math.round(task.progress) + '%');
+                
+                let stepText = '';
+                if (task.current_step && task.total_steps) {
+                    stepText = ` (Step ${task.current_step} of ${task.total_steps})`;
+                }
+                
+                $('#upload-message').text(`Processing documents${stepText}... This may take some time.`);
+            }
+        });
+    }
+
+    // Load knowledge bases from the server
+    function loadKnowledgeBases() {
+        $.get('/api/kbs', function(kbs) {
+            // Update KB select dropdowns
+            let options = '<option value="">Select Knowledge Base</option>';
+            for (let i = 0; i < kbs.length; i++) {
+                options += `<option value="${kbs[i].name}">${kbs[i].name}</option>`;
+            }
+            $('#kb-select, #search-kb-select').html(options);
+            
+            // Update KB list
+            let kbListHtml = '';
+            if (kbs.length === 0) {
+                kbListHtml = '<p>No knowledge bases found. Create one to get started.</p>';
+            } else {
+                for (let i = 0; i < kbs.length; i++) {
+                    const kb = kbs[i];
+                    kbListHtml += `
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">${kb.name}</h5>
+                                    <p class="card-text">${kb.description || 'No description'}</p>
+                                    <p class="text-muted">Created: ${new Date(kb.created_at).toLocaleString()}</p>
+                                    <p class="text-muted">Owner: ${kb.owner || 'Unknown'}</p>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn btn-sm btn-primary view-kb-btn" data-kb-name="${kb.name}">View Details</button>
+                                    <a href="#" onclick="$('#upload-tab').tab('show'); $('#kb-select').val('${kb.name}');" class="btn btn-sm btn-outline-primary">Upload Documents</a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            $('#kb-list').html(kbListHtml);
+            
+            // Add click handlers for KB detail buttons
+            $('.view-kb-btn').on('click', function() {
+                const kbName = $(this).data('kb-name');
+                showKbDetails(kbName);
+            });
+            
+            // Update KB count in system status
+            $('#kb-count').text(`${kbs.length} knowledge base(s)`);
+        });
+    }
+
+    // Create a new knowledge base
+    function createKnowledgeBase() {
+        const name = $('#kb-name').val();
+        const description = $('#kb-description').val();
+        const owner = $('#kb-owner').val();
+        
+        if (!name) {
+            alert('Please enter a name for the knowledge base');
+            return;
+        }
+        
+        // Create KB data
+        const data = {
+            name: name,
+            description: description || '',
+            owner: owner || 'UI User'
+        };
+        
+        // Send request
+        $.ajax({
+            url: '/api/kbs',
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            success: function(response) {
+                // Close modal
+                $('#createKbModal').modal('hide');
+                
+                // Reset form
+                $('#create-kb-form')[0].reset();
+                
+                // Reload KB list
+                loadKnowledgeBases();
+                
+                // Show success message
+                alert('Knowledge base created successfully');
+            },
+            error: function(xhr) {
+                alert(`Error: ${xhr.responseJSON?.error || 'Unknown error'}`);
+            }
+        });
+    }
+
+    // Show knowledge base details
+    function showKbDetails(kbName) {
+        $.get(`/api/kbs/${kbName}/status`, function(kb) {
+            let html = `
+                <h4>${kb.name}</h4>
+                <p>${kb.description || 'No description'}</p>
+                <p><strong>Created:</strong> ${new Date(kb.created_at).toLocaleString()}</p>
+                <p><strong>Owner:</strong> ${kb.owner || 'Unknown'}</p>
+                
+                <h5>Content Statistics</h5>
+                <table class="table table-striped">
+                    <tbody>
+                        <tr>
+                            <td>Raw files</td>
+                            <td>${kb.stats.raw_files}</td>
+                        </tr>
+                        <tr>
+                            <td>Processed files</td>
+                            <td>${kb.stats.processed_files}</td>
+                        </tr>
+                        <tr>
+                            <td>Metadata files</td>
+                            <td>${kb.stats.metadata_files}</td>
+                        </tr>
+                        <tr>
+                            <td>Citation files</td>
+                            <td>${kb.stats.citation_files}</td>
+                        </tr>
+                        <tr>
+                            <td>Chunks</td>
+                            <td>${kb.stats.chunks}</td>
+                        </tr>
+                        <tr>
+                            <td>Documentation</td>
+                            <td>${kb.stats.documentation}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="mt-3">
+                    <button class="btn btn-primary" onclick="$('#upload-tab').tab('show'); $('#kb-select').val('${kb.name}');">
+                        Upload Documents
+                    </button>
+                </div>
+            `;
+            
+            $('#kb-detail-content').html(html);
+            $('#kbDetailModal').modal('show');
+        });
+    }
+
+    // Load tasks from the server
+    function loadTasks() {
+        $.get('/api/tasks', function(tasks) {
+            // Update active tasks
+            let activeTasksHtml = '';
+            if (tasks.active.length === 0) {
+                activeTasksHtml = '<p>No active tasks</p>';
+            } else {
+                for (let i = 0; i < tasks.active.length; i++) {
+                    const task = tasks.active[i];
+                    let taskTitle = task.type;
+                    if (task.type === 'process_batch') {
+                        taskTitle = 'Processing Documents';
+                    } else if (task.type === 'create_maps') {
+                        taskTitle = 'Creating Knowledge Maps';
+                    } else if (task.type === 'chunk_documents') {
+                        taskTitle = 'Chunking Documents';
+                    } else if (task.type === 'workflow') {
+                        taskTitle = 'Document Workflow';
+                    }
+                    
+                    activeTasksHtml += `
+                        <div class="card task-card">
+                            <div class="card-body">
+                                <h5 class="card-title">${taskTitle}</h5>
+                                <p class="card-text">KB: ${task.kb_name}</p>
+                                <p class="card-text">Status: ${task.status}</p>
+                                <div class="progress">
+                                    <div class="progress-bar" role="progressbar" style="width: ${task.progress}%" 
+                                        aria-valuenow="${task.progress}" aria-valuemin="0" aria-valuemax="100">
+                                        ${Math.round(task.progress)}%
+                                    </div>
+                                </div>
+                                <p class="text-muted mt-2">Started: ${new Date(task.created_at).toLocaleString()}</p>
+                                <button class="btn btn-sm btn-info view-task-btn" data-task-id="${task.id}">View Details</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            $('#active-tasks-list').html(activeTasksHtml);
+            
+            // Update completed tasks
+            let completedTasksHtml = '';
+            if (tasks.completed.length === 0) {
+                completedTasksHtml = '<p>No completed tasks</p>';
+            } else {
+                for (let i = 0; i < tasks.completed.length; i++) {
+                    const task = tasks.completed[i];
+                    let taskTitle = task.type;
+                    let statusClass = task.status === 'completed' ? 'text-success' : 'text-danger';
+                    
+                    if (task.type === 'process_batch') {
+                        taskTitle = 'Processing Documents';
+                    } else if (task.type === 'create_maps') {
+                        taskTitle = 'Creating Knowledge Maps';
+                    } else if (task.type === 'chunk_documents') {
+                        taskTitle = 'Chunking Documents';
+                    } else if (task.type === 'workflow') {
+                        taskTitle = 'Document Workflow';
+                    }
+                    
+                    completedTasksHtml += `
+                        <div class="card task-card">
+                            <div class="card-body">
+                                <h5 class="card-title">${taskTitle}</h5>
+                                <p class="card-text">KB: ${task.kb_name}</p>
+                                <p class="card-text">Status: <span class="${statusClass}">${task.status}</span></p>
+                                <p class="text-muted">Completed: ${new Date(task.completed_at).toLocaleString()}</p>
+                                <button class="btn btn-sm btn-info view-task-btn" data-task-id="${task.id}">View Details</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            $('#completed-tasks-list').html(completedTasksHtml);
+            
+            // Add click handlers for task detail buttons
+            $('.view-task-btn').on('click', function() {
+                const taskId = $(this).data('task-id');
+                showTaskDetails(taskId);
+            });
+            
+            // Update active task count in system status
+            $('#active-task-count').text(`${tasks.active.length} active task(s)`);
+        });
+    }
+
+    // Show task details
+    function showTaskDetails(taskId) {
+        $.get(`/api/tasks/${taskId}`, function(task) {
+            let html = `
+                <h4>Task Details</h4>
+                <p><strong>ID:</strong> ${task.id}</p>
+                <p><strong>Type:</strong> ${task.type}</p>
+                <p><strong>Knowledge Base:</strong> ${task.kb_name}</p>
+                <p><strong>Status:</strong> ${task.status}</p>
+                <p><strong>Created:</strong> ${new Date(task.created_at).toLocaleString()}</p>
+            `;
+            
+            if (task.completed_at) {
+                html += `<p><strong>Completed:</strong> ${new Date(task.completed_at).toLocaleString()}</p>`;
+            }
+            
+            if (task.error) {
+                html += `<p><strong>Error:</strong> ${task.error}</p>`;
+            }
+            
+            if (task.result) {
+                html += `<h5>Results</h5><pre>${JSON.stringify(task.result, null, 2)}</pre>`;
+            }
+            
+            $('#task-detail-content').html(html);
+            $('#taskDetailModal').modal('show');
+        });
+    }
+
+    // Search knowledge base
+    function searchKnowledgeBase() {
+        const kbName = $('#search-kb-select').val();
+        const query = $('#search-query').val();
+        
+        if (!kbName) {
+            alert('Please select a knowledge base');
+            return;
+        }
+        
+        if (!query) {
+            alert('Please enter a search query');
+            return;
+        }
+        
+        // Show searching message
+        $('#search-results').html('<p>Searching...</p>');
+        
+        // Send search request
+        $.get(`/api/search?kb=${kbName}&query=${encodeURIComponent(query)}`, function(results) {
+            if (!results.length) {
+                $('#search-results').html('<p>No results found</p>');
+                return;
+            }
+            
+            let html = `<h3>Search Results (${results.length})</h3>`;
+            html += '<div class="list-group">';
+            
+            for (let i = 0; i < results.length; i++) {
+                const result = results[i];
+                html += `
+                    <div class="list-group-item">
+                        <h5>${result.title || 'Document ' + result.doc_id}</h5>
+                        <p>${result.snippet || 'No preview available'}</p>
+                        <p class="text-muted">Citation: ${result.citation || 'No citation available'}</p>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            $('#search-results').html(html);
+        }).fail(function(xhr) {
+            $('#search-results').html(`<p>Error: ${xhr.responseJSON?.error || 'Unknown error'}</p>`);
+        });
+    }
+
+    // Update system status display
+    function updateSystemStatus() {
+        // This would normally get data from the server
+        // For this demo, we'll simulate random usage
+        const cpuUsage = Math.floor(Math.random() * 40) + 10; // 10-50%
+        const memoryUsage = Math.floor(Math.random() * 30) + 10; // 10-40%
+        
+        $('#cpu-usage').text(`${cpuUsage}%`);
+        $('#cpu-progress').css('width', `${cpuUsage}%`);
+        
+        $('#memory-usage').text(`${memoryUsage}%`);
+        $('#memory-progress').css('width', `${memoryUsage}%`);
+        
+        // This would normally get the worker count from the server
+        $.get('/api/tasks', function(tasks) {
+            $('#worker-count').text(tasks.active.length);
+        });
+    }
+</script>
+</body>
+</html>
