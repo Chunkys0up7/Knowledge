@@ -10,7 +10,7 @@ import queue
 from pathlib import Path
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from flask import Flask, request, render_template, jsonify, send_from_directory
+from flask import Flask, request, render_template, jsonify, send_from_directory, redirect, url_for
 
 # Add parent directory to path to import modules
 parent_dir = Path(__file__).resolve().parent.parent
@@ -20,29 +20,40 @@ from ingestor.bulk_ingestor import BulkIngestor, SimpleImageProcessor
 from processor.chunker import SemanticChunker
 from processor.kb_repository import KnowledgeBaseRepository
 from processor.citation_processor import CitationProcessor
+from config import get_config
+
+# Load configuration
+config = get_config()
 
 # Setup logging
+logging_level = getattr(logging, config.get('logging.level', 'INFO'))
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging_level,
+    format=config.get('logging.format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('ui.log')
+        logging.FileHandler(config.get('logging.file', 'ui.log'))
     ]
 )
 logger = logging.getLogger('knowledge_ui')
 
+# Initialize Flask app
 app = Flask(__name__, static_folder='static')
 
-# Configuration
-app.config['UPLOAD_FOLDER'] = '/tmp/kb_uploads'
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB max payload
-app.config['KB_BASE_DIR'] = '/data/knowledge_bases'
+# Get app configuration from config
+app.config['UPLOAD_FOLDER'] = config.get('temp_dir', '/tmp/kb_uploads')
+app.config['MAX_CONTENT_LENGTH'] = config.get('web_ui.max_upload_size_mb', 1024) * 1024 * 1024
+app.config['KB_BASE_DIR'] = config.get('kb_base_dir', '/data/knowledge_bases')
 app.config['RESOURCE_LIMITS'] = {
-    'max_workers': 4,  # Maximum concurrent worker threads
-    'chunk_size': 10,  # Process files in chunks of 10
-    'memory_limit': 1024 * 1024 * 1024,  # 1GB memory limit (soft limit)
+    'max_workers': config.get('processing.max_workers', 4),
+    'chunk_size': config.get('processing.chunk_size', 10),
+    'memory_limit': config.get('processing.memory_limit_mb', 1024) * 1024 * 1024,
 }
+app.config['COMPANY'] = config.get('company', {})
+app.config['ALLOWED_EXTENSIONS'] = set([ext.lstrip('.') for ext in config.get('web_ui.allowed_file_types', [])])
+
+# Set secret key for sessions
+app.secret_key = config.get('web_ui.session_secret', 'change-this-in-production')
 
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -298,7 +309,7 @@ This batch contains {len(task['doc_ids'])} documents processed on {datetime.now(
         logger.error(f"Error in create_maps: {e}")
         task['status'] = 'error'
         task['error'] = str(e)
-        active_tasks[task['id']] = task]
+        active_tasks[task['id']] = task
 
 def chunk_documents(task):
     """Chunk documents for RAG."""
@@ -316,8 +327,8 @@ def chunk_documents(task):
         )
         
         chunker = SemanticChunker(
-            max_tokens=task.get('max_tokens', 512),
-            overlap=task.get('overlap', 64)
+            max_tokens=task.get('max_tokens', config.get('chunking.max_tokens', 512)),
+            overlap=task.get('overlap', config.get('chunking.overlap', 64))
         )
         
         # Setup progress tracking
@@ -363,7 +374,12 @@ def chunk_documents(task):
         logger.error(f"Error in chunk_documents: {e}")
         task['status'] = 'error'
         task['error'] = str(e)
-        active_tasks[task['id']] = task]
+        active_tasks[task['id']] = task
+
+# Helper function to check if a filename is allowed
+def allowed_file(filename):
+    """Check if a filename has an allowed extension."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 # Routes
 @app.route('/')
@@ -372,7 +388,10 @@ def index():
     # Get list of knowledge bases
     kbs = kb_repo.list_kbs()
     
-    return render_template('index.html', kbs=kbs)
+    # Pass company config to template
+    company_config = app.config['COMPANY']
+    
+    return render_template('index.html', kbs=kbs, company=company_config)
 
 @app.route('/api/kbs', methods=['GET'])
 def get_kbs():
@@ -472,10 +491,17 @@ def upload_files():
         # Save uploaded files
         saved_files = []
         for file in files:
-            filename = secure_filename(file.filename)
-            file_path = batch_dir / filename
-            file.save(file_path)
-            saved_files.append(str(file_path))
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = batch_dir / filename
+                file.save(file_path)
+                saved_files.append(str(file_path))
+            else:
+                # Skip files with disallowed extensions
+                logger.warning(f"Skipping file with disallowed extension: {file.filename}")
+            
+        if not saved_files:
+            return jsonify({'error': 'No valid files uploaded'}), 400
             
         # Create processing task
         task_id = str(uuid.uuid4())
@@ -588,8 +614,8 @@ def api_chunk_documents():
         data = request.json
         kb_name = data.get('kb_name')
         doc_ids = data.get('doc_ids', [])
-        max_tokens = data.get('max_tokens', 512)
-        overlap = data.get('overlap', 64)
+        max_tokens = data.get('max_tokens', config.get('chunking.max_tokens', 512))
+        overlap = data.get('overlap', config.get('chunking.overlap', 64))
         
         if not kb_name:
             return jsonify({'error': 'Missing kb_name parameter'}), 400
@@ -668,10 +694,17 @@ def api_process_workflow():
         # Save uploaded files
         saved_files = []
         for file in files:
-            filename = secure_filename(file.filename)
-            file_path = batch_dir / filename
-            file.save(file_path)
-            saved_files.append(str(file_path))
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = batch_dir / filename
+                file.save(file_path)
+                saved_files.append(str(file_path))
+            else:
+                # Skip files with disallowed extensions
+                logger.warning(f"Skipping file with disallowed extension: {file.filename}")
+                
+        if not saved_files:
+            return jsonify({'error': 'No valid files uploaded'}), 400
             
         # Create workflow task - we'll track this task ID
         workflow_id = str(uuid.uuid4())
@@ -725,19 +758,135 @@ def api_process_workflow():
         logger.error(f"Error starting workflow: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/search', methods=['GET'])
+def search_api():
+    """Search the knowledge base."""
+    try:
+        kb_name = request.args.get('kb')
+        query = request.args.get('query')
+        limit = int(request.args.get('limit', 10))
+        
+        if not kb_name:
+            return jsonify({'error': 'Missing kb parameter'}), 400
+            
+        if not query:
+            return jsonify({'error': 'Missing query parameter'}), 400
+            
+        # Check if KB exists
+        try:
+            kb = kb_repo.get_kb(kb_name)
+        except:
+            return jsonify({'error': f'Knowledge base {kb_name} not found'}), 404
+            
+        # For now, implement a simple keyword search
+        # In a real implementation, use the actual search system
+        chunks_dir = kb['path'] / 'chunks' / 'text'
+        
+        if not chunks_dir.exists():
+            return jsonify([])
+            
+        # Simple keyword search
+        keyword = query.lower()
+        found_chunks = []
+        
+        for chunk_file in chunks_dir.glob("*.txt"):
+            with open(chunk_file, 'r', encoding='utf-8') as f:
+                content = f.read().lower()
+                if keyword in content:
+                    chunk_id = chunk_file.stem
+                    
+                    # Get chunk metadata
+                    metadata_file = kb['path'] / 'chunks' / 'metadata' / f"{chunk_id}.json"
+                    if metadata_file.exists():
+                        with open(metadata_file, 'r') as mf:
+                            metadata = json.load(mf)
+                            # Create search result
+                            result = {
+                                'chunk_id': chunk_id,
+                                'doc_id': metadata.get('doc_id', 'unknown'),
+                                'title': metadata.get('title', 'Unknown'),
+                                'citation': metadata.get('citation_text', 'No citation available'),
+                                'snippet': self._get_snippet(content, keyword),
+                                'score': 1.0  # Placeholder score
+                            }
+                            found_chunks.append(result)
+        
+        # Sort by score and limit results
+        found_chunks = sorted(found_chunks, key=lambda x: x['score'], reverse=True)[:limit]
+        
+        return jsonify(found_chunks)
+        
+    except Exception as e:
+        logger.error(f"Error searching: {e}")
+        return jsonify({'error': str(e)}), 500
+        
+def _get_snippet(content, keyword, context_chars=150):
+    """Get a text snippet around the keyword."""
+    keyword_pos = content.find(keyword)
+    if keyword_pos == -1:
+        return content[:context_chars] + "..."
+        
+    start = max(0, keyword_pos - context_chars // 2)
+    end = min(len(content), keyword_pos + len(keyword) + context_chars // 2)
+    
+    snippet = content[start:end]
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(content):
+        snippet = snippet + "..."
+        
+    return snippet
+
 # Serve static files
 @app.route('/static/<path:path>')
 def send_static(path):
     return send_from_directory('static', path)
 
+# Serve custom company logo if configured
+@app.route('/company-logo')
+def serve_company_logo():
+    logo_url = app.config['COMPANY'].get('logo_url')
+    
+    if not logo_url:
+        # Return a default logo or redirect to a placeholder
+        return redirect('/static/default-logo.png')
+        
+    # If it's a file path, serve it
+    if os.path.exists(logo_url):
+        return send_from_directory(os.path.dirname(logo_url), os.path.basename(logo_url))
+        
+    # If it's a URL, redirect to it
+    if logo_url.startswith(('http://', 'https://')):
+        return redirect(logo_url)
+        
+    # Fallback
+    return redirect('/static/default-logo.png')
+
+# Health check endpoint
+@app.route('/health')
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'version': '1.0.0',
+        'workers': worker_count,
+        'queue_size': processing_queue.qsize(),
+        'active_tasks': len(active_tasks),
+        'completed_tasks': len(completed_tasks)
+    })
+
 # Main entry point
 if __name__ == '__main__':
     # Start worker threads
-    for _ in range(2):  # Start with 2 workers
+    initial_workers = config.get('processing.max_workers', 4) // 2  # Start with half the workers
+    for _ in range(initial_workers):
         thread = threading.Thread(target=worker_thread)
         thread.daemon = True
         thread.start()
         worker_count += 1
         
     # Start the app
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    host = config.get('web_ui.host', '0.0.0.0')
+    port = config.get('web_ui.port', 5000)
+    debug = config.get('web_ui.debug', False)
+    
+    app.run(host=host, port=port, debug=debug)

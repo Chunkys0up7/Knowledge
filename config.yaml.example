@@ -1,0 +1,159 @@
+# Knowledge Management System Configuration
+# This is an example configuration file. Copy to config.yaml and modify as needed.
+
+# Base paths - Configure these for your environment
+output_dir: /data/knowledge_base
+kb_base_dir: /data/knowledge_bases  
+temp_dir: /tmp/kb_uploads
+
+# Company information - Customize with your company details
+company:
+  name: "Acme Corporation"
+  logo_url: "/path/to/logo.png"  # Path or URL to company logo
+  color_primary: "#1976D2"        # Primary brand color
+  color_secondary: "#F57C00"      # Secondary brand color
+  domain: "acme.example.com"
+  contact_email: "support@acme.example.com"
+
+# Web UI configuration
+web_ui:
+  enabled: true
+  host: 0.0.0.0
+  port: 5000
+  debug: false
+  title: "Acme Knowledge Management System"
+  session_secret: "change-this-in-production-env"  # IMPORTANT: Set this in production
+  max_upload_size_mb: 1024  # 1GB
+  allowed_file_types:
+    # Code files
+    - .py
+    - .js
+    - .ts
+    - .java
+    - .c
+    - .cpp
+    - .h
+    - .cs
+    - .go
+    - .rb
+    - .php
+    - .swift
+    - .kt
+    - .rs
+    - .sh
+    - .ps1
+    - .bat
+    
+    # Documentation files
+    - .md
+    - .markdown
+    - .txt
+    - .csv
+    - .json
+    - .yaml
+    - .yml
+    
+    # Documents
+    - .pdf
+    - .doc
+    - .docx
+    - .ppt
+    - .pptx
+    - .xls
+    - .xlsx
+    
+    # Images
+    - .jpg
+    - .jpeg
+    - .png
+    - .gif
+    - .bmp
+    - .tiff
+    - .webp
+
+# API configuration
+api:
+  enabled: true
+  require_auth: true
+  auth_provider: "jwt"  # "none", "jwt", "oauth2"
+  jwt_secret: "change-this-in-production-env"  # IMPORTANT: Set this in production
+  token_expiry_hours: 24
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+  cors:
+    enabled: true
+    allow_origins: 
+      - "https://acme.example.com"
+    allow_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+
+# Document processing configuration
+processing:
+  batch_size: 50               # Number of documents to process in one batch
+  polling_interval: 300        # Directory watch interval in seconds (5 minutes)
+  max_workers: 4               # Maximum concurrent worker threads
+  chunk_size: 10               # Process files in chunks of 10
+  memory_limit_mb: 1024        # 1GB memory limit (soft limit)
+  git_auto_commit: true        # Automatically commit changes to Git
+
+# Chunking configuration
+chunking:
+  max_tokens: 512              # Maximum tokens per chunk
+  overlap: 64                  # Overlap between chunks
+  min_chunk_size: 100          # Minimum characters per chunk
+  respect_boundaries: true     # Respect semantic boundaries
+
+# Storage configuration
+storage:
+  vector_store:
+    type: "faiss"             # "faiss", "qdrant", "elastic"
+    path: "/data/knowledge_base/vectors"
+    dimensions: 768
+    metric: "cosine"
+  git_store:
+    enabled: true
+    lfs_enabled: false        # Git LFS for large files
+    auto_push: false          # Auto push to remote
+    remote_url: null
+    username: null            # Leave as null if using SSH keys
+    token: null               # GitHub/GitLab token if needed
+
+# Image processing
+image_processing:
+  enabled: true
+  ocr: true
+  ocr_engine: "tesseract"     # "tesseract", "google", "azure"
+  ocr_api_key: null           # API key for cloud OCR services
+  image_description: true     # Generate descriptions for images
+
+# Search configuration
+search:
+  hybrid_search: true         # Combine vector and keyword search
+  vector_weight: 0.7
+  keyword_weight: 0.3
+  max_results: 10
+  min_score: 0.5              # Minimum similarity score (0-1)
+
+# Security configuration
+security:
+  abac_enabled: false         # Attribute-based access control
+  audit_trail: true           # Log all access
+  pii_detection: false        # Personally identifiable information detection
+  sensitive_info_detection: false  # Detect sensitive information
+
+# Logging configuration
+logging:
+  level: "INFO"               # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "knowledge_system.log"
+  max_size_mb: 10
+  backup_count: 3
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Watch directories for automated processing
+watch_directories:
+  - "/path/to/watch/dir1"
+  - "/path/to/watch/dir2"
